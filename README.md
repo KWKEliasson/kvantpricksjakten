@@ -13,5 +13,5 @@ Uses openpyxl and xlrd libraries
 
 ## Todo
 - Read additional sample meta data
-- Implement peak fitting and background subtraction
-- Refactor code to be more structured and readable
+- Implement peak fitting
+- Implement background subtraction
