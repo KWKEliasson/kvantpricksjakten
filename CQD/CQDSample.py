@@ -98,7 +98,9 @@ def write_spectrum(ws, charts, sample, spec_key):  # Utility function to write s
     ws.append(['Våglängd [nm]'] + to_list_nan(spec.wl_vector))
     for c in next(ws.iter_rows(min_row=ws.max_row, max_col=len(spec.wl_vector)+1)):
         c.fill = PatternFill('solid', fgColor=wl_color)
-    xvalues = Reference(ws, min_col=1, max_col=len(spec.wl_vector)+1, min_row=ws.max_row, max_row=ws.max_row)
+    xvalues = Reference(ws, min_col=2, max_col=len(spec.wl_vector)+1, min_row=ws.max_row, max_row=ws.max_row)
+    chart.x_axis.scaling.min = spec.wl_vector.min()
+    chart.x_axis.scaling.max = spec.wl_vector.max()
 
     for key, val in spec.y_vectors.items():
         ws.append([spec_names[key]] + to_list_nan(val))
