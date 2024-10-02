@@ -9,9 +9,12 @@ Reads sample data from 'RawData' directory containing files:
 - Plate to Excel sheet.xlsx
 
 Create structured and formated .xlsx files from data.
-Uses openpyxl and xlrd libraries
+
+Uses [openpyxl](https://openpyxl.readthedocs.io) and [xlrd](https://xlrd.readthedocs.io) libraries
 
 ## Todo
 - Read additional sample meta data
-- Implement peak fitting
-- Implement background subtraction
+- Implement spectrum analysis features:
+  - Plotting 
+  - Peak fitting
+  - Background subtraction
