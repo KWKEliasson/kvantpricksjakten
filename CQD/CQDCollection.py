@@ -14,7 +14,7 @@ class CQDCollection:
 
     def __init__(self):
         self.samples = []
-        self.qcd1_book = None
+        self.cqd1_book = None
         self.qcd2_book = None
 
     @classmethod
@@ -34,7 +34,7 @@ class CQDCollection:
         cqd1_path = os.path.join(path, 'CQD_measurements1.xls')
         if not os.path.isfile(cqd1_path):
             raise FileNotFoundError(cqd1_path + ' does not exist')
-        self.qcd1_book = open_workbook(cqd1_path)
+        self.cqd1_book = open_workbook(cqd1_path, on_demand=True)
 
         cqd2_path = os.path.join(path, 'CQD_measurements2.xlsx')
         if not os.path.isfile(cqd2_path):
@@ -52,8 +52,8 @@ class CQDCollection:
         self.parse_plate_index(plate_index_path)
 
         # cleanup to save memory
-        self.qcd1_book = None
-        self.qcd2_book = None
+        self.cqd1_book.release_resources()
+        self.qcd2_book.close()
 
         return self
 
@@ -117,7 +117,7 @@ class CQDCollection:
         :return:
         """
         try:
-            ws = self.qcd1_book.sheet_by_name(sheet_name)
+            ws = self.cqd1_book.sheet_by_name(sheet_name)
         except XLRDError:
             print('Could not find sheet {} in QCD1 workbook'.format(sheet_name))
             return
@@ -142,6 +142,7 @@ class CQDCollection:
             if len(samples) != 1:
                 raise ValueError('plate={}, well={} finds {} samples. Not exactly 1!'.format(plate, well, len(samples)))
             samples[0].spectra[spec_type] = spectrum
+            self.cqd1_book.unload_sheet(sheet_name) #  close sheet to save memory
 
     def parse_xlsx_sheet(self, sheet_name, plate):
         """

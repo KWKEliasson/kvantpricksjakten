@@ -1,6 +1,7 @@
 import numpy as np
 from openpyxl.styles import Font, PatternFill
 from openpyxl.chart import ScatterChart, Reference
+# If I just import Series my IDE gives and error, but it still works
 from openpyxl.chart.series_factory import SeriesFactory as Series
 
 # Values used for xlsx formatting
@@ -18,6 +19,7 @@ chart_names = {'abs': 'Absorbtion',
 y_names = {'abs': 'absorbans',
            'ex350': 'counts',
            'ex400': 'counts'}
+
 
 class CQDSample:
     """Class representing a Carbon Quantum Dot sample"""
