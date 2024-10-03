@@ -1,5 +1,6 @@
 import os.path
 import re
+import numpy as np
 from openpyxl import load_workbook
 from xlrd import open_workbook, XLRDError
 from CQD.CQDSpectrum import CQDSpectrum
@@ -55,6 +56,9 @@ class CQDCollection:
         self.cqd1_book.release_resources()
         self.qcd2_book.close()
 
+        # init abs background in CQDSpectrum
+        self.init_abs_background()
+
         return self
 
     def parse_map_book(self, map_path):
@@ -67,7 +71,7 @@ class CQDCollection:
         plate = None
         klass = None
         well_mod = None
-        for row in ms.iter_rows(min_row=1, max_col=5, values_only=True):
+        for row in ms.iter_rows(min_row=1, max_col=7, values_only=True):
             if row[0] == 'Plate':
                 plate = row[1]  # New plate
             if row[0] == 'A':
@@ -75,11 +79,11 @@ class CQDCollection:
             if row[0] == 'E':
                 well_mod = 12  # Second row of plate
 
-            if row[3] is not None:
-                klass = row[3]  # New klass
+            if row[5] is not None:
+                klass = row[5]  # New klass
 
             if row[2] is not None:
-                self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[4]))  # append sample
+                self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[6]))  # append sample
 
     def parse_plate_index(self, plate_index_path):
         """
@@ -142,7 +146,7 @@ class CQDCollection:
             if len(samples) != 1:
                 raise ValueError('plate={}, well={} finds {} samples. Not exactly 1!'.format(plate, well, len(samples)))
             samples[0].spectra[spec_type] = spectrum
-            self.cqd1_book.unload_sheet(sheet_name) #  close sheet to save memory
+            self.cqd1_book.unload_sheet(sheet_name)  # close sheet to save memory
 
     def parse_xlsx_sheet(self, sheet_name, plate):
         """
@@ -184,6 +188,29 @@ class CQDCollection:
             if len(samples) != 1:
                 raise ValueError('plate={}, well={} finds {} samples. Not exactly 1!'.format(plate, well, len(samples)))
             samples[0].spectra[spec_type] = spectrum
+
+    def init_abs_background(self):
+        """
+        Initialize the absorbance background of the CQDSpectrum class from blank sample absorbance spectra
+        :return: Nothing
+        """
+        blank_samples = []
+        blank_sample_comments = ['no sample in eppendorfrör', 'sample missing', 'missing sample']
+        _ = [blank_samples.append(x) for x in self.samples if x.comment in blank_sample_comments]
+        bg_abs_ys = []
+        bg_abs_x = None
+        for samp in blank_samples:
+            bg_abs_ys.append(samp.spectra['abs'].y_vectors['Abs'])
+            if bg_abs_x is None:
+                bg_abs_x = samp.spectra['abs'].wl_vector
+            elif not np.array_equal(bg_abs_x, samp.spectra['abs'].wl_vector):
+                raise ValueError('Error initializing absorbance background. Sample {} has different wl_vector'
+                                 .format(samp))
+
+        bg_abs_ys = np.array(bg_abs_ys)
+        mean_y = bg_abs_ys.mean(axis=0)
+        CQDSpectrum.bg_abs_x = bg_abs_x
+        CQDSpectrum.bg_abs_y = mean_y
 
 
 def parse_spectrometer_label(label):

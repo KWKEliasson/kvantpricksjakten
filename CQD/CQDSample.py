@@ -13,7 +13,7 @@ spec_names = {'Abs': 'Absorbans',
               'Cu': 'Koppar',
               'Fe': 'Järn',
               'Cd': 'Kadmium'}
-chart_names = {'abs': 'Absorbtion',
+chart_names = {'abs': 'Absorbans',
                'ex350': 'Fluorescens 350nm excitation',
                'ex400': 'Fluorescens 400nm excitation'}
 y_names = {'abs': 'absorbans',
@@ -55,7 +55,7 @@ class CQDSample:
             ws.append(['Inget avvikande noterat vid analys!'])
         ws.append([])  # 1 blank rows
 
-        ws.append(['Absorbtionsmätning'])
+        ws.append(['Absorbansmätning'])
         ws.cell(ws.max_row, 1).font = ft_heading
         write_spectrum(ws, charts, self, 'abs')
         ws.append([])  # 1 blank rows
@@ -102,7 +102,8 @@ def write_spectrum(ws, charts, sample, spec_key):  # Utility function to write s
     chart.x_axis.scaling.min = spec.wl_vector.min()
     chart.x_axis.scaling.max = spec.wl_vector.max()
 
-    for key, val in spec.y_vectors.items():
+    subbed = spec.subtracted()
+    for key, val in subbed.items():
         ws.append([spec_names[key]] + to_list_nan(val))
         yvalues = Reference(ws, min_col=1, max_col=len(spec.wl_vector)+1, min_row=ws.max_row, max_row=ws.max_row)
         series = Series(yvalues, xvalues, title_from_data=True)
