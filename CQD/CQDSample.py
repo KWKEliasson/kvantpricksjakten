@@ -102,8 +102,12 @@ def write_spectrum(ws, charts, sample, spec_key):  # Utility function to write s
     chart.x_axis.scaling.min = spec.wl_vector.min()
     chart.x_axis.scaling.max = spec.wl_vector.max()
 
-    subbed = spec.subtracted()
-    for key, val in subbed.items():
+    y_vecs = spec.y_vectors
+    # Subtract background only for absorbance spectra
+    if spec_key == 'abs':
+        y_vecs = spec.subtracted()
+
+    for key, val in y_vecs.items():
         ws.append([spec_names[key]] + to_list_nan(val))
         yvalues = Reference(ws, min_col=1, max_col=len(spec.wl_vector)+1, min_row=ws.max_row, max_row=ws.max_row)
         series = Series(yvalues, xvalues, title_from_data=True)

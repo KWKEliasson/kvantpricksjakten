@@ -56,6 +56,11 @@ class CQDCollection:
         self.cqd1_book.release_resources()
         self.qcd2_book.close()
 
+        flu_bg_path = os.path.join(path, 'Fluorescence baseline.xlsx')
+        if not os.path.isfile(flu_bg_path):
+            raise FileNotFoundError(flu_bg_path + ' does not exist')
+        self.parse_flu_bg_sheet(flu_bg_path)
+
         # init abs background in CQDSpectrum
         self.init_abs_background()
 
@@ -84,6 +89,7 @@ class CQDCollection:
 
             if row[2] is not None:
                 self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[6]))  # append sample
+        map_book.close()
 
     def parse_plate_index(self, plate_index_path):
         """
@@ -112,6 +118,7 @@ class CQDCollection:
                 self.parse_xlsx_sheet("Sheet{}".format(sheet_ind), plate)
             else:
                 raise ValueError('Plate {} has invalid sheet index description'.format(plate))
+        index_book.close()
 
     def parse_xls_sheet(self, sheet_name, plate):
         """
@@ -181,13 +188,55 @@ class CQDCollection:
             val_col = list(ws.iter_cols(min_row=l_row + 2, max_row=st_row, min_col=5, max_col=5, values_only=True))
 
             spectrum = CQDSpectrum.spectrum_from_xl_data(ws.cell(st_row + 1, 2).value, ws.cell(et_row + 1, 2).value,
-                                                         list(attr_col[0]), list(val_col[0]),
-                                                         rows)
+                                                         list(attr_col[0]), list(val_col[0]), rows)
             well, spec_type = parse_spectrometer_label(i.value)
             samples = list(s for s in self.samples if s.plate == plate and s.well == well)
             if len(samples) != 1:
                 raise ValueError('plate={}, well={} finds {} samples. Not exactly 1!'.format(plate, well, len(samples)))
             samples[0].spectra[spec_type] = spectrum
+
+    def parse_flu_bg_sheet(self, flu_bg_path):
+        wb = load_workbook(flu_bg_path)
+        ws = wb.active
+        fc = ws['A']
+        for i in (x for x in fc if x.value is not None and x.value.startswith('Label: ')):
+            l_row = fc.index(i)
+            st_row = fc.index(next((x for x in fc[l_row:] if x.value == 'Start Time:')))
+            et_row = fc.index(next((x for x in fc[l_row:] if x.value == 'End Time:')))
+            wl_row = fc.index(next((x for x in fc[l_row:] if x.value == 'Wavel.')))
+
+            rows = []
+            while fc[wl_row].value is not None:
+                r = list(ws.iter_rows(min_row=wl_row + 1, max_row=wl_row + 1, values_only=True))[0]
+                try:
+                    end_i = r.index(None)
+                    rows.append(list(r[:end_i]))
+                except ValueError:
+                    rows.append(list(r))
+                wl_row += 1
+
+            attr_col = list(ws.iter_cols(min_row=l_row + 2, max_row=st_row, min_col=1, max_col=1, values_only=True))
+            val_col = list(ws.iter_cols(min_row=l_row + 2, max_row=st_row, min_col=5, max_col=5, values_only=True))
+
+            spectrum = CQDSpectrum.spectrum_from_xl_data(ws.cell(st_row + 1, 2).value, ws.cell(et_row + 1, 2).value,
+                                                         list(attr_col[0]), list(val_col[0]),
+                                                         rows)
+            if spectrum.meta_data['ex_wl'] == 350:
+                if CQDSpectrum.bg_ex350_x is None:
+                    CQDSpectrum.bg_ex350_x = spectrum.wl_vector
+                elif not np.array_equal(CQDSpectrum.bg_ex350_x, spectrum.wl_vector):
+                    raise ValueError("Trying to initialize fluorescence background with invalid wavelength vector")
+                CQDSpectrum.bg_ex350_ys[spectrum.meta_data['gain']] = spectrum.y_vectors
+            elif spectrum.meta_data['ex_wl'] == 400:
+                if CQDSpectrum.bg_ex400_x is None:
+                    CQDSpectrum.bg_ex400_x = spectrum.wl_vector
+                elif not np.array_equal(CQDSpectrum.bg_ex400_x, spectrum.wl_vector):
+                    raise ValueError("Trying to initialize fluorescence background with invalid wavelength vector")
+                CQDSpectrum.bg_ex400_ys[spectrum.meta_data['gain']] = spectrum.y_vectors
+            else:
+                raise ValueError('Spectrum with invalid wavelength {} in "Fluorescence baseline.xlsx" file'.
+                                 format(spectrum.meta_data['ex_wl']))
+        wb.close()
 
     def init_abs_background(self):
         """
