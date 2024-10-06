@@ -32,28 +32,45 @@ class CQDCollection:
         self = CQDCollection()
         if not os.path.isdir(path):
             raise NotADirectoryError(path + ' is not an existing directory')
+
+        # .xls measurement data file not used anymore
+        """
         cqd1_path = os.path.join(path, 'CQD_measurements1.xls')
         if not os.path.isfile(cqd1_path):
             raise FileNotFoundError(cqd1_path + ' does not exist')
         self.cqd1_book = open_workbook(cqd1_path, on_demand=True)
+        """
 
-        cqd2_path = os.path.join(path, 'CQD_measurements2.xlsx')
+        # cqd2_path = os.path.join(path, 'CQD_measurements2.xlsx')
+        cqd2_path = os.path.join(path, 'CQD_measurements_abs adjusted_fluor adjusted.xlsx')
         if not os.path.isfile(cqd2_path):
             raise FileNotFoundError(cqd2_path + ' does not exist')
         self.qcd2_book = load_workbook(cqd2_path)
 
-        map_path = os.path.join(path, 'Well plate map.xlsx')
+        # map_path = os.path.join(path, 'Well plate map.xlsx')
+        map_path = os.path.join(path, 'Well plate map5oct24.xlsx')
         if not os.path.isfile(map_path):
             raise FileNotFoundError(map_path + ' does not exist')
         self.parse_map_book(map_path)
 
+        # Plate index not used anymore
+        """ 
         plate_index_path = os.path.join(path, 'Plate to Excel sheet.xlsx')
         if not os.path.isfile(plate_index_path):
             raise FileNotFoundError(plate_index_path + ' does not exist')
         self.parse_plate_index(plate_index_path)
+        """
+
+        for sheet in self.qcd2_book.worksheets:
+            plate = ""
+            try:
+                plate = int(re.match('.*?([0-9]+)$', sheet.title).group(1))
+            except AttributeError:
+                raise ValueError('Invalid worksheet name: {}'.format(sheet.title))
+            self.parse_xlsx_sheet(sheet.title, plate)
 
         # cleanup to save memory
-        self.cqd1_book.release_resources()
+        # self.cqd1_book.release_resources()
         self.qcd2_book.close()
 
         flu_bg_path = os.path.join(path, 'Fluorescence baseline.xlsx')
@@ -87,8 +104,14 @@ class CQDCollection:
             if row[5] is not None:
                 klass = row[5]  # New klass
 
+            reactants = []
+            if row[3] is not None:
+                reactants.append(row[3])
+            if row[4] is not None:
+                reactants.append(row[4])
+
             if row[2] is not None:
-                self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[6]))  # append sample
+                self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[6], reactants))
         map_book.close()
 
     def parse_plate_index(self, plate_index_path):
@@ -249,6 +272,8 @@ class CQDCollection:
         bg_abs_ys = []
         bg_abs_x = None
         for samp in blank_samples:
+            if 'abs' not in samp.spectra:
+                continue
             bg_abs_ys.append(samp.spectra['abs'].y_vectors['Abs'])
             if bg_abs_x is None:
                 bg_abs_x = samp.spectra['abs'].wl_vector

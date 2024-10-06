@@ -23,13 +23,14 @@ y_names = {'abs': 'absorbans',
 
 class CQDSample:
     """Class representing a Carbon Quantum Dot sample"""
-    def __init__(self, label, plate, well, klass, comment):
+    def __init__(self, label, plate, well, klass, comment, reactants):
         self.label = label  # id string assigned to sample
         self.plate = plate  # index of plate where sample is found
         self.well = well  # index of well in plate where sample is found
         self.klass = klass  # school class that produced sample
         self.comment = comment  # comment entered when analysing sample
         self.spectra = {}  # dictionary of analysis spectra
+        self.reactants = reactants  # list of reactants used
 
     def __repr__(self):
         specs = list(self.spectra.keys())
