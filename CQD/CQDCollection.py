@@ -48,7 +48,7 @@ class CQDCollection:
         self.qcd2_book = load_workbook(cqd2_path)
 
         # map_path = os.path.join(path, 'Well plate map.xlsx')
-        map_path = os.path.join(path, 'Well plate map5oct24.xlsx')
+        map_path = os.path.join(path, 'Well plate map_7oct24.xlsx')
         if not os.path.isfile(map_path):
             raise FileNotFoundError(map_path + ' does not exist')
         self.parse_map_book(map_path)
@@ -91,7 +91,6 @@ class CQDCollection:
         map_book = load_workbook(map_path)
         ms = map_book.active
         plate = None
-        klass = None
         well_mod = None
         for row in ms.iter_rows(min_row=1, max_col=7, values_only=True):
             if row[0] == 'Plate':
@@ -101,9 +100,6 @@ class CQDCollection:
             if row[0] == 'E':
                 well_mod = 12  # Second row of plate
 
-            if row[5] is not None:
-                klass = row[5]  # New klass
-
             reactants = []
             if row[3] is not None:
                 reactants.append(row[3])
@@ -111,6 +107,7 @@ class CQDCollection:
                 reactants.append(row[4])
 
             if row[2] is not None:
+                klass = row[5].strip().upper()
                 self.samples.append(CQDSample(str(row[2]), plate, well_mod + row[1], klass, row[6], reactants))
         map_book.close()
 
@@ -192,6 +189,15 @@ class CQDCollection:
             return
         fc = ws['A']
         for i in (x for x in fc if x.value is not None and x.value.startswith('Label: ')):
+
+            well, spec_type = parse_spectrometer_label(i.value)
+            samples = list(s for s in self.samples if s.plate == plate and s.well == well)
+            if len(samples) == 0:
+                print('plate={}, well={} no sample initialized. Discarding data!'.format(plate, well))
+                continue
+            elif len(samples) > 1:
+                raise ValueError('plate={}, well={} finds {} samples. More than 1!'.format(plate, well, len(samples)))
+
             l_row = fc.index(i)
             st_row = fc.index(next((x for x in fc[l_row:] if x.value == 'Start Time:')))
             et_row = fc.index(next((x for x in fc[l_row:] if x.value == 'End Time:')))
@@ -212,10 +218,6 @@ class CQDCollection:
 
             spectrum = CQDSpectrum.spectrum_from_xl_data(ws.cell(st_row + 1, 2).value, ws.cell(et_row + 1, 2).value,
                                                          list(attr_col[0]), list(val_col[0]), rows)
-            well, spec_type = parse_spectrometer_label(i.value)
-            samples = list(s for s in self.samples if s.plate == plate and s.well == well)
-            if len(samples) != 1:
-                raise ValueError('plate={}, well={} finds {} samples. Not exactly 1!'.format(plate, well, len(samples)))
             samples[0].spectra[spec_type] = spectrum
 
     def parse_flu_bg_sheet(self, flu_bg_path):
@@ -267,7 +269,13 @@ class CQDCollection:
         :return: Nothing
         """
         blank_samples = []
-        blank_sample_comments = ['no sample in eppendorfrör', 'sample missing', 'missing sample']
+        blank_sample_comments = ['no sample in eppendorfrör (analysis is of water only)',
+                                 'sample missing (analysis is of water only)',
+                                 'Eppendorfrör empty - analysis is of water only',
+                                 'sample and protokoll missing (analysis is of water only)',
+                                 'sample missing - analysis is of water only',
+                                 'No sample, synthesis did not work - analysis is of water only',
+                                 'reference sample with only water']
         _ = [blank_samples.append(x) for x in self.samples if x.comment in blank_sample_comments]
         bg_abs_ys = []
         bg_abs_x = None
